@@ -36,8 +36,9 @@ RUN mix release
 FROM docker.io/library/alpine:3.20 AS runner
 
 # ncurses-libs: required by BEAM
+# libstdc++/libgcc: required by ERTS (C++ runtime)
 # openssl/ca-certificates: TLS + cert validation
-RUN apk add --no-cache ncurses-libs openssl ca-certificates
+RUN apk add --no-cache ncurses-libs libstdc++ libgcc openssl ca-certificates
 
 WORKDIR /app
 
