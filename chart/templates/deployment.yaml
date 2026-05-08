@@ -34,9 +34,7 @@ spec:
             - name: PHX_SERVER
               value: "true"
             - name: PHX_HOST
-              valueFrom:
-                fieldRef:
-                  fieldPath: status.podIP
+              value: {{ .Values.env.phxHost | default "localhost" | quote }}
             - name: PHAETON_URL
               value: {{ .Values.phaeton.url | quote }}
             - name: PHAETON_AGENT_TOKEN

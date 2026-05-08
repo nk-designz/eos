@@ -22,6 +22,9 @@ ingress:
           pathType: Prefix
   tls: []
 
+env:
+  phxHost: "localhost"
+
 # Phaeton broker connection
 phaeton:
   url: "http://phaeton:4000"
