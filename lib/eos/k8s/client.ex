@@ -77,6 +77,14 @@ defmodule Eos.K8s.Client do
     end
   end
 
+  def get_pod_logs(pod_name, tail_lines \\ 150) do
+    with {:ok, c} <- conn() do
+      op = K8s.Client.get("v1", "pods/log", namespace: namespace(), name: pod_name)
+      op = %{op | query_params: [tailLines: tail_lines]}
+      K8s.Client.run(c, op)
+    end
+  end
+
   def watch_plugins do
     with {:ok, c} <- conn() do
       op = K8s.Client.watch(@group <> "/" <> @version, @kind, namespace: namespace())

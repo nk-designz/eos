@@ -11,12 +11,15 @@ defmodule EosWeb.BrokerLive.Index do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket), do: send(self(), :check_connectivity)
+
     socket =
       socket
       |> assign_new(:current_scope, fn -> nil end)
       |> assign(:page_title, "Context Brokers")
       |> assign(:form_open, false)
       |> assign(:form_error, nil)
+      |> assign(:broker_status, %{})
       |> load_brokers()
 
     {:ok, socket}
@@ -94,6 +97,15 @@ defmodule EosWeb.BrokerLive.Index do
     end
   end
 
+  @impl true
+  def handle_info(:check_connectivity, socket) do
+    Process.send_after(self(), :check_connectivity, 60_000)
+    status = check_all_connectivity(socket.assigns.brokers)
+    {:noreply, assign(socket, :broker_status, status)}
+  end
+
+  def handle_info(_, socket), do: {:noreply, socket}
+
   # ---------------------------------------------------------------------------
   # Private
   # ---------------------------------------------------------------------------
@@ -147,6 +159,37 @@ defmodule EosWeb.BrokerLive.Index do
       end
 
     assign(socket, :brokers, brokers)
+  end
+
+  defp check_all_connectivity(brokers) do
+    brokers
+    |> Task.async_stream(
+      fn broker ->
+        name = get_in(broker, ["metadata", "name"])
+        result = ping_broker(broker)
+        {name, result}
+      end,
+      timeout: 8_000,
+      on_timeout: :kill_task
+    )
+    |> Enum.reduce(%{}, fn
+      {:ok, {name, result}}, acc -> Map.put(acc, name, result)
+      {:exit, _}, acc -> acc
+    end)
+  end
+
+  defp ping_broker(broker) do
+    url = get_in(broker, ["spec", "url"])
+    tenant = get_in(broker, ["spec", "tenant"])
+    secret_name = get_in(broker, ["spec", "tokenSecretRef", "name"])
+    secret_key = get_in(broker, ["spec", "tokenSecretRef", "key"]) || "token"
+
+    with {:ok, token} when is_binary(token) <- K8sClient.read_secret_value(secret_name, secret_key),
+         :ok <- Eos.Broker.Client.ping(%{url: url, token: token, tenant: tenant}) do
+      :ok
+    else
+      _ -> :error
+    end
   end
 
   @impl true
@@ -274,6 +317,7 @@ defmodule EosWeb.BrokerLive.Index do
               <% tenant = get_in(broker, ["spec", "tenant"]) %>
               <% secret_name = get_in(broker, ["spec", "tokenSecretRef", "name"]) %>
               <% phase = get_in(broker, ["status", "phase"]) %>
+              <% connectivity = Map.get(@broker_status, name) %>
               <div
                 id={"broker-#{name}"}
                 class="group flex items-center justify-between px-5 py-4 bg-base-100 border border-base-300 rounded-xl hover:border-primary/30 hover:shadow-sm transition-all"
@@ -294,6 +338,24 @@ defmodule EosWeb.BrokerLive.Index do
                         ]}>
                           {phase}
                         </span>
+                      <% end %>
+                      <%!-- Connectivity badge --%>
+                      <%= cond do %>
+                        <% connectivity == :ok -> %>
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 text-success">
+                            <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+                            Connected
+                          </span>
+                        <% connectivity == :error -> %>
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-error/15 text-error">
+                            <span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                            Unreachable
+                          </span>
+                        <% true -> %>
+                          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-base-200 text-base-content/30">
+                            <span class="w-1.5 h-1.5 rounded-full bg-base-content/20"></span>
+                            Checking…
+                          </span>
                       <% end %>
                     </div>
                     <p class="text-sm text-base-content/50 truncate font-mono">{url}</p>

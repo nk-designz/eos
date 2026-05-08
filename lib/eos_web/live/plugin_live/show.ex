@@ -10,11 +10,13 @@ defmodule EosWeb.PluginLive.Show do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Eos.PubSub, "plugins")
       Phoenix.PubSub.subscribe(Eos.PubSub, "plugin_events:#{plugin_name}")
+      send(self(), :refresh_logs)
     end
 
     socket =
       socket
       |> assign(:plugin_name, plugin_name)
+      |> assign(:logs, nil)
       |> load_plugin(plugin_name)
       |> load_entities(plugin_name)
       |> assign(:events, [])
@@ -35,6 +37,11 @@ defmodule EosWeb.PluginLive.Show do
   def handle_info({:entity_event, event}, socket) do
     events = [event | Enum.take(socket.assigns.events, 49)]
     {:noreply, assign(socket, :events, events)}
+  end
+
+  def handle_info(:refresh_logs, socket) do
+    Process.send_after(self(), :refresh_logs, 5_000)
+    {:noreply, fetch_logs(socket)}
   end
 
   def handle_info(_, socket), do: {:noreply, socket}
@@ -129,8 +136,59 @@ defmodule EosWeb.PluginLive.Show do
             <% end %>
           </div>
         </div>
+
+        <%!-- Pod Logs --%>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold">Pod Logs</h2>
+            <span class="text-xs text-base-content/40">auto-refreshes every 5 s</span>
+          </div>
+          <%= cond do %>
+            <% is_nil(@logs) and not @connected -> %>
+              <div class="bg-base-200 rounded-xl p-6 text-center text-sm text-base-content/40">
+                No logs yet — pod may still be starting.
+              </div>
+            <% is_nil(@logs) -> %>
+              <div class="bg-base-200 rounded-xl p-6 text-center text-sm text-base-content/40">
+                Loading logs…
+              </div>
+            <% @logs == "" -> %>
+              <div class="bg-base-200 rounded-xl p-6 text-center text-sm text-base-content/40">
+                No log output yet.
+              </div>
+            <% true -> %>
+              <div
+                id="pod-logs"
+                class="relative rounded-xl bg-black overflow-hidden"
+              >
+                <div class="flex items-center justify-between px-4 py-2 bg-black border-b border-white/10">
+                  <span class="font-mono text-xs text-white/40">
+                    {get_in(@plugin, ["status", "podName"]) || "eos-plugin-#{@plugin_name}"}
+                  </span>
+                  <span class="flex items-center gap-1.5 text-xs text-success">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
+                    live
+                  </span>
+                </div>
+                <pre
+                  id="pod-logs-pre"
+                  phx-hook=".ScrollBottom"
+                  class="p-4 font-mono text-xs text-white overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap break-all"
+                  phx-no-curly-interpolation
+                ><%= @logs %></pre>
+              </div>
+          <% end %>
+        </div>
       </div>
     </Layouts.app>
+
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".ScrollBottom">
+      export default {
+        updated() {
+          this.el.scrollTop = this.el.scrollHeight
+        }
+      }
+    </script>
     """
   end
 
@@ -157,6 +215,25 @@ defmodule EosWeb.PluginLive.Show do
     socket
     |> assign(:plugin, plugin)
     |> assign(:connected, connected)
+  end
+
+  defp fetch_logs(socket) do
+    # Pod name is always "eos-plugin-{plugin_name}" by controller convention.
+    # We fall back to this because status.podName may not be set if the CRD
+    # status subresource patch failed.
+    pod_name =
+      get_in(socket.assigns.plugin || %{}, ["status", "podName"]) ||
+        "eos-plugin-#{socket.assigns.plugin_name}"
+
+    logs =
+      case Eos.K8s.Client.get_pod_logs(pod_name) do
+        {:ok, text} when is_binary(text) and text != "" ->
+          # Strip ANSI escape sequences (colors, bold, dim, etc.)
+          String.replace(text, ~r/\x1b\[[0-9;]*[A-Za-z]/, "")
+        _ -> nil
+      end
+
+    assign(socket, :logs, logs)
   end
 
   defp load_entities(socket, plugin_name) do

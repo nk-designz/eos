@@ -25,6 +25,14 @@ defmodule Eos.Broker.Client do
     end
   end
 
+  def ping(broker_config) when is_map(broker_config) do
+    case Req.get(base_req(broker_config), url: "/types", receive_timeout: 5_000) do
+      {:ok, %{status: status}} when status in [200, 204] -> :ok
+      {:ok, %{status: status}} -> {:error, status}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   defp base_req(config) when is_map(config) do
     %{url: url, token: token, tenant: tenant} = config
 
