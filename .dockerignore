@@ -1,0 +1,23 @@
+# Build artifacts
+_build/
+deps/
+
+# Version control
+.git/
+.gitignore
+
+# Dev tooling
+.elixir_ls/
+.lexical/
+
+# Test files
+test/
+
+# Compiled assets (rebuilt inside Docker)
+priv/static/
+
+# Examples (not part of the app image)
+examples/
+
+# Misc
+*.md
