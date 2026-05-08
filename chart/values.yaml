@@ -1,0 +1,61 @@
+replicaCount: 1
+
+image:
+  repository: eos
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 4000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: eos.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Phaeton broker connection
+phaeton:
+  url: "http://phaeton:4000"
+  # Name of a K8s secret with key PHAETON_AGENT_TOKEN
+  agentTokenSecret: "eos-phaeton-token"
+  agentTokenKey: "token"
+
+# Public URLs for the agent (used for webhook registration and plugin WS)
+agent:
+  baseUrl: "http://eos:4000"
+  wsUrl: "ws://eos:4000/plugins"
+
+# K8s namespace where plugin pods are created (defaults to same namespace)
+pluginNamespace: ""
+
+# Secret holding PLUGIN_TOKEN_SECRET and SECRET_KEY_BASE
+secretName: "eos-secrets"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 4000
+  initialDelaySeconds: 10
+  periodSeconds: 30
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 4000
+  initialDelaySeconds: 5
+  periodSeconds: 10

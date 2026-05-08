@@ -1,0 +1,97 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: plugins.eos.io
+spec:
+  group: eos.io
+  names:
+    kind: Plugin
+    listKind: PluginList
+    plural: plugins
+    singular: plugin
+    shortNames:
+      - pl
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Broker
+          type: string
+          jsonPath: .spec.brokerRef
+        - name: EntityType
+          type: string
+          jsonPath: .status.entityTypeUri
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [image, brokerRef]
+              properties:
+                image:
+                  type: string
+                  description: OCI image reference for the plugin pod
+                brokerRef:
+                  type: string
+                  description: Name of a Broker CRD in the same namespace
+                replicas:
+                  type: integer
+                  minimum: 0
+                  maximum: 1
+                  default: 1
+                  description: Number of plugin pod replicas (0 = stopped, 1 = running)
+                resources:
+                  type: object
+                  properties:
+                    requests:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                        memory:
+                          type: string
+                    limits:
+                      type: object
+                      properties:
+                        cpu:
+                          type: string
+                        memory:
+                          type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Pending, Running, Error, Stopped]
+                podName:
+                  type: string
+                tokenSecret:
+                  type: string
+                  description: Name of the K8s Secret holding the PLUGIN_TOKEN for this plugin
+                subscriptionId:
+                  type: string
+                entityTypeUri:
+                  type: string
+                  description: NGSI-LD entity type URI reported by the plugin on registration
+                registeredAt:
+                  type: string
+                  format: date-time
+                connectedAt:
+                  type: string
+                  format: date-time
+                errorMessage:
+                  type: string
+                observedGeneration:
+                  type: integer

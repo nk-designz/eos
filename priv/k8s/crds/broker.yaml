@@ -1,0 +1,71 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: brokers.eos.io
+spec:
+  group: eos.io
+  names:
+    kind: Broker
+    listKind: BrokerList
+    plural: brokers
+    singular: broker
+    shortNames:
+      - br
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: URL
+          type: string
+          jsonPath: .spec.url
+        - name: Tenant
+          type: string
+          jsonPath: .spec.tenant
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [url, tenant, tokenSecretRef]
+              properties:
+                url:
+                  type: string
+                  description: Base URL of the NGSI-LD context broker (e.g. https://broker.example.com)
+                tenant:
+                  type: string
+                  description: Default NGSI-LD tenant for this broker
+                tokenSecretRef:
+                  type: object
+                  required: [name]
+                  description: Reference to a K8s Secret containing the bearer token
+                  properties:
+                    name:
+                      type: string
+                      description: Name of the K8s Secret
+                    key:
+                      type: string
+                      default: token
+                      description: "Key within the Secret data (default: token)"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Ready, Error, Unknown]
+                checkedAt:
+                  type: string
+                  format: date-time
+                errorMessage:
+                  type: string
