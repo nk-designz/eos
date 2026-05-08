@@ -17,6 +17,10 @@ spec:
         {{- include "eos.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "eos.fullname" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
