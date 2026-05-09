@@ -12,18 +12,18 @@ metadata:
   labels:
     {{- include "eos.labels" . | nindent 4 }}
 rules:
-  # Plugin CRD management
+  # Plugin + Broker CRD management
   - apiGroups: ["eos.io"]
-    resources: ["plugins", "plugins/status"]
+    resources: ["plugins", "plugins/status", "brokers", "brokers/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Pod management for plugin pods
   - apiGroups: [""]
-    resources: ["pods"]
+    resources: ["pods", "pods/log"]
     verbs: ["get", "list", "watch", "create", "delete"]
-  # Read ConfigMaps and Secrets referenced by plugins
+  # Read ConfigMaps and Secrets referenced by plugins/brokers
   - apiGroups: [""]
     resources: ["configmaps", "secrets"]
-    verbs: ["get"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
