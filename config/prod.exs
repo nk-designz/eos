@@ -15,7 +15,7 @@ config :eos, EosWeb.Endpoint,
     rewrite_on: [:x_forwarded_proto],
     exclude: [
       hosts: ["localhost", "127.0.0.1"],
-      paths: ["/health", "/live", "/plugins"]
+      paths: ["/health", "/live/websocket", "/plugins/websocket"]
     ]
   ]
 
