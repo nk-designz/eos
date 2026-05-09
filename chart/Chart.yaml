@@ -2,7 +2,7 @@ apiVersion: v2
 name: eos
 description: EOS IoT Agent — bridges WASM plugins to the Phaeton NGSI-LD context broker
 type: application
-version: 0.1.3
+version: 0.1.4
 appVersion: "latest"
 keywords:
   - ngsi-ld

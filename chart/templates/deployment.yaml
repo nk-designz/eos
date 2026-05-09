@@ -60,6 +60,16 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.secretName }}
                   key: PLUGIN_TOKEN_SECRET
+            - name: BASIC_AUTH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: BASIC_AUTH_USERNAME
+            - name: BASIC_AUTH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secretName }}
+                  key: BASIC_AUTH_PASSWORD
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:

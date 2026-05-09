@@ -10,6 +10,10 @@ defmodule EosWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :basic_auth do
+    plug EosWeb.Plugs.BasicAuth
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -21,7 +25,7 @@ defmodule EosWeb.Router do
   end
 
   scope "/", EosWeb do
-    pipe_through :browser
+    pipe_through [:browser, :basic_auth]
 
     live "/", DashboardLive
     live "/brokers", BrokerLive.Index, :index

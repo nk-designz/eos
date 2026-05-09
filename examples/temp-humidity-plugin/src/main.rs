@@ -177,7 +177,7 @@ async fn main() {
     let ws_base   = env::var("IOT_AGENT_WS_URL").expect("IOT_AGENT_WS_URL env var required");
 
     let ws_base = ws_base.trim_end_matches('/');
-    let ws_url  = format!("{ws_base}/websocket?token={token}");
+    let ws_url  = format!("{ws_base}/websocket?vsn=2.0.0&token={token}");
 
     info!(plugin_id, "Plugin starting → {ws_base}/websocket");
 

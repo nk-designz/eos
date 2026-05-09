@@ -42,6 +42,8 @@ end
 
 # EOS IoT Agent configuration
 config :eos,
+  basic_auth_username: System.get_env("BASIC_AUTH_USERNAME", "admin"),
+  basic_auth_password: System.get_env("BASIC_AUTH_PASSWORD", "start-123"),
   phaeton_url: System.get_env("PHAETON_URL", "http://localhost:4001"),
   phaeton_agent_token: System.get_env("PHAETON_AGENT_TOKEN", ""),
   agent_base_url: System.get_env("AGENT_BASE_URL", "http://localhost:4000"),
