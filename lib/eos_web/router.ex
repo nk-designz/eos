@@ -14,6 +14,12 @@ defmodule EosWeb.Router do
     plug :accepts, ["json"]
   end
 
+  # Health check for Kubernetes probes (bypasses SSL redirect)
+  scope "/health", EosWeb do
+    pipe_through :api
+    get "/", HealthController, :check
+  end
+
   scope "/", EosWeb do
     pipe_through :browser
 
