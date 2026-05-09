@@ -38,11 +38,14 @@ spec:
           properties:
             spec:
               type: object
-              required: [image, entityTypeUri]
+              required: [image]
               properties:
                 image:
                   type: string
                   description: OCI image reference for the plugin (must contain a WASM runner)
+                brokerRef:
+                  type: string
+                  description: Name of the Broker CR this plugin connects to
                 entityTypeUri:
                   type: string
                   description: NGSI-LD entity type URI this plugin owns (e.g. https://example.org/Switch)
