@@ -67,8 +67,22 @@ defmodule Eos.K8s.PluginController do
         {:ok, token}
 
       {:error, %{"reason" => "AlreadyExists"}} ->
-        # Secret already exists, token is deterministic
-        {:ok, token}
+        # Secret already exists — update it to ensure the token matches the current PLUGIN_TOKEN_SECRET
+        case Client.update_secret(secret_name, %{"PLUGIN_TOKEN" => token}) do
+          {:ok, _} ->
+            Logger.info(
+              "[PluginController] Updated token secret #{secret_name} for plugin #{plugin_name}"
+            )
+
+            {:ok, token}
+
+          {:error, reason} ->
+            Logger.warning(
+              "[PluginController] Could not update token secret for #{plugin_name}: #{inspect(reason)}"
+            )
+
+            {:ok, token}
+        end
 
       {:error, reason} ->
         Logger.warning(

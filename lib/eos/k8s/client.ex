@@ -106,6 +106,20 @@ defmodule Eos.K8s.Client do
     end
   end
 
+  def update_secret(name, string_data) do
+    with {:ok, c} <- conn() do
+      secret = %{
+        "apiVersion" => "v1",
+        "kind" => "Secret",
+        "metadata" => %{"name" => name, "namespace" => namespace()},
+        "stringData" => string_data
+      }
+
+      op = K8s.Client.patch("v1", "Secret", [namespace: namespace(), name: name], secret)
+      K8s.Client.run(c, op)
+    end
+  end
+
   def delete_secret(name) do
     with {:ok, c} <- conn() do
       op = K8s.Client.delete("v1", "Secret", namespace: namespace(), name: name)
