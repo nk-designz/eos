@@ -15,7 +15,8 @@ defmodule EosWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  socket "/plugins", EosWeb.Channels.PluginSocket, websocket: true
+  socket "/plugins", EosWeb.Channels.PluginSocket,
+    websocket: [serializer: [{Phoenix.Socket.V2.JSONSerializer, "~> 2.0.0"}]]
 
   # Serve at "/" the static files from "priv/static" directory.
   #
