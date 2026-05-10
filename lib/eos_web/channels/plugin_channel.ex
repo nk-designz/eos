@@ -42,7 +42,8 @@ defmodule EosWeb.Channels.PluginChannel do
         Registry.register(plugin_id, %{
           entity_type_uri: entity_type_uri,
           broker_config: broker_config,
-          channel_pid: self()
+          channel_pid: self(),
+          subscription_id: nil
         })
 
         Task.start(fn ->
@@ -180,7 +181,8 @@ defmodule EosWeb.Channels.PluginChannel do
           Registry.register(plugin_id, %{
             entity_type_uri: "unknown",
             broker_config: broker,
-            channel_pid: self()
+            channel_pid: self(),
+            subscription_id: nil
           })
 
           {:ok, broker}
