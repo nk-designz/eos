@@ -41,11 +41,10 @@ defmodule Eos.K8s.Client do
       op =
         K8s.Client.patch(
           @group <> "/" <> @version,
-          @kind,
+          {@kind, "status"},
           [namespace: namespace(), name: name],
           resource,
-          subresource: "status",
-          content_type: "application/merge-patch+json"
+          :merge
         )
 
       K8s.Client.run(c, op)
@@ -197,11 +196,10 @@ defmodule Eos.K8s.Client do
       op =
         K8s.Client.patch(
           @group <> "/" <> @version,
-          @broker_kind,
+          {@broker_kind, "status"},
           [namespace: namespace(), name: name],
           resource,
-          subresource: "status",
-          content_type: "application/merge-patch+json"
+          :merge
         )
 
       K8s.Client.run(c, op)
