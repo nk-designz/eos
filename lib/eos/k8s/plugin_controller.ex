@@ -70,6 +70,8 @@ defmodule Eos.K8s.PluginController do
         # Secret already exists — update it to ensure the token matches the current PLUGIN_TOKEN_SECRET
         case Client.update_secret(secret_name, %{"PLUGIN_TOKEN" => token}) do
           {:ok, _} ->
+            patch_status(plugin_name, %{"tokenSecret" => secret_name})
+
             Logger.info(
               "[PluginController] Updated token secret #{secret_name} for plugin #{plugin_name}"
             )
@@ -88,6 +90,8 @@ defmodule Eos.K8s.PluginController do
         # Secret already exists — update it to ensure the token matches the current PLUGIN_TOKEN_SECRET
         case Client.update_secret(secret_name, %{"PLUGIN_TOKEN" => token}) do
           {:ok, _} ->
+            patch_status(plugin_name, %{"tokenSecret" => secret_name})
+
             Logger.info(
               "[PluginController] Updated token secret #{secret_name} for plugin #{plugin_name}"
             )
@@ -158,6 +162,7 @@ defmodule Eos.K8s.PluginController do
 
     case Client.get_pod(pod_name) do
       {:ok, _pod} ->
+        patch_status(plugin_name, %{"phase" => "Running", "podName" => pod_name})
         :ok
 
       {:error, _} ->

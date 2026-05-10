@@ -15,11 +15,15 @@ defmodule EosWeb.Endpoint do
     websocket: [connect_info: [session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]
 
-  # Use V2 serializer for plugin socket, but accept vsn=1.0.0 clients as well.
-  # The plugin sends Phoenix V2 array format [join_ref, ref, topic, event, payload]
-  # regardless of the vsn it negotiates, so we always decode with V2.
+  # Plugin clients may send V2 arrays with `join_ref: null` after join.
+  # Use a compatibility serializer that normalizes join_ref for routing.
   socket "/plugins", EosWeb.Channels.PluginSocket,
-    websocket: [serializer: [{Phoenix.Socket.V2.JSONSerializer, "~> 1.0.0"}, {Phoenix.Socket.V2.JSONSerializer, "~> 2.0.0"}]]
+    websocket: [
+      serializer: [
+        {EosWeb.Channels.PluginV2CompatSerializer, "~> 1.0.0"},
+        {EosWeb.Channels.PluginV2CompatSerializer, "~> 2.0.0"}
+      ]
+    ]
 
   # Serve at "/" the static files from "priv/static" directory.
   #
