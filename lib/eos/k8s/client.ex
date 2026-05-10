@@ -36,12 +36,7 @@ defmodule Eos.K8s.Client do
 
   def patch_plugin_status(name, status_patch) do
     with {:ok, c} <- conn() do
-      resource = %{
-        "apiVersion" => "#{@group}/#{@version}",
-        "kind" => @kind,
-        "metadata" => %{"name" => name, "namespace" => namespace()},
-        "status" => status_patch
-      }
+      resource = %{"status" => status_patch}
 
       op =
         K8s.Client.patch(
@@ -49,7 +44,8 @@ defmodule Eos.K8s.Client do
           @kind,
           [namespace: namespace(), name: name],
           resource,
-          subresource: "status"
+          subresource: "status",
+          content_type: "application/merge-patch+json"
         )
 
       K8s.Client.run(c, op)
@@ -196,12 +192,7 @@ defmodule Eos.K8s.Client do
 
   def patch_broker_status(name, status_patch) do
     with {:ok, c} <- conn() do
-      resource = %{
-        "apiVersion" => "#{@group}/#{@version}",
-        "kind" => @broker_kind,
-        "metadata" => %{"name" => name, "namespace" => namespace()},
-        "status" => status_patch
-      }
+      resource = %{"status" => status_patch}
 
       op =
         K8s.Client.patch(
@@ -209,7 +200,8 @@ defmodule Eos.K8s.Client do
           @broker_kind,
           [namespace: namespace(), name: name],
           resource,
-          subresource: "status"
+          subresource: "status",
+          content_type: "application/merge-patch+json"
         )
 
       K8s.Client.run(c, op)

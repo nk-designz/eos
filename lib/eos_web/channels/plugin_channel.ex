@@ -75,8 +75,8 @@ defmodule EosWeb.Channels.PluginChannel do
   def handle_in("entity_create", %{"request_id" => req_id, "entity" => entity}, socket) do
     plugin_id = socket.assigns.plugin_id
 
-    case Registry.lookup(plugin_id) do
-      {:ok, %{broker_config: broker}} ->
+    case ensure_broker_config(plugin_id) do
+      {:ok, broker} ->
         Task.start(fn ->
           result = Client.create_entity(entity, broker)
           reply_entity_response(socket, req_id, result)
@@ -84,10 +84,10 @@ defmodule EosWeb.Channels.PluginChannel do
 
         {:noreply, socket}
 
-      :error ->
+      {:error, reason} ->
         {:reply,
          {:error,
-          %{request_id: req_id, code: "not_registered", message: "Plugin not registered"}},
+          %{request_id: req_id, code: "not_registered", message: inspect(reason)}},
          socket}
     end
   end
@@ -99,8 +99,8 @@ defmodule EosWeb.Channels.PluginChannel do
       ) do
     plugin_id = socket.assigns.plugin_id
 
-    case Registry.lookup(plugin_id) do
-      {:ok, %{broker_config: broker}} ->
+    case ensure_broker_config(plugin_id) do
+      {:ok, broker} ->
         Task.start(fn ->
           result = Client.update_entity(entity_id, attrs, broker)
           reply_entity_response(socket, req_id, result)
@@ -108,10 +108,10 @@ defmodule EosWeb.Channels.PluginChannel do
 
         {:noreply, socket}
 
-      :error ->
+      {:error, reason} ->
         {:reply,
          {:error,
-          %{request_id: req_id, code: "not_registered", message: "Plugin not registered"}},
+          %{request_id: req_id, code: "not_registered", message: inspect(reason)}},
          socket}
     end
   end
@@ -119,8 +119,8 @@ defmodule EosWeb.Channels.PluginChannel do
   def handle_in("entity_delete", %{"request_id" => req_id, "entity_id" => entity_id}, socket) do
     plugin_id = socket.assigns.plugin_id
 
-    case Registry.lookup(plugin_id) do
-      {:ok, %{broker_config: broker}} ->
+    case ensure_broker_config(plugin_id) do
+      {:ok, broker} ->
         Task.start(fn ->
           result = Client.delete_entity(entity_id, broker)
           reply_entity_response(socket, req_id, result)
@@ -128,10 +128,10 @@ defmodule EosWeb.Channels.PluginChannel do
 
         {:noreply, socket}
 
-      :error ->
+      {:error, reason} ->
         {:reply,
          {:error,
-          %{request_id: req_id, code: "not_registered", message: "Plugin not registered"}},
+          %{request_id: req_id, code: "not_registered", message: inspect(reason)}},
          socket}
     end
   end
@@ -167,6 +167,24 @@ defmodule EosWeb.Channels.PluginChannel do
     else
       nil -> {:error, "brokerRef not set in plugin spec"}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp ensure_broker_config(plugin_id) do
+    case Registry.lookup(plugin_id) do
+      {:ok, %{broker_config: broker}} ->
+        {:ok, broker}
+
+      :error ->
+        with {:ok, broker} <- resolve_broker_config(plugin_id) do
+          Registry.register(plugin_id, %{
+            entity_type_uri: "unknown",
+            broker_config: broker,
+            channel_pid: self()
+          })
+
+          {:ok, broker}
+        end
     end
   end
 
