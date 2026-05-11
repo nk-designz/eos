@@ -1,7 +1,8 @@
-//! EOS IoT Agent — Example plugin: mock temperature & humidity sensor.
+//! EOS IoT Agent — Example plugin: MET weather feed for Braunschweig.
 //!
 //! Connects to the EOS agent via Phoenix Channels (JSON WebSocket transport),
-//! registers as a WeatherObserved provider, and publishes mock readings every 10 s.
+//! registers as a WeatherObserved provider, and publishes real readings from
+//! api.met.no (yr.no backend) every 10 minutes.
 //!
 //! Required env vars (injected by the EOS operator into the plugin pod):
 //!   PLUGIN_ID          — unique plugin name, e.g. "temp-sensor-1"
@@ -12,12 +13,16 @@ use std::{env, time::Duration};
 
 use anyhow::{anyhow, Context, Result};
 use futures_util::{SinkExt, StreamExt};
-use rand::Rng;
+use reqwest::header::USER_AGENT;
 use serde_json::{json, Value};
 use tokio::time::{interval, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+const BRAUNSCHWEIG_LAT: f64 = 52.2689;
+const BRAUNSCHWEIG_LON: f64 = 10.5268;
+const MET_USER_AGENT: &str = "eos-temp-humidity-plugin/0.1 (+https://eos.nk-desig.nz)";
 
 // ---------------------------------------------------------------------------
 // Phoenix channel wire format helpers
@@ -132,31 +137,68 @@ fn unix_secs_to_parts(mut secs: u64) -> (u64, u64, u64, u64, u64, u64) {
 }
 
 // ---------------------------------------------------------------------------
-// Mock sensor with Gaussian-ish random walk
+// MET weather API fetcher (api.met.no / yr.no)
 // ---------------------------------------------------------------------------
 
-struct Sensor {
-    temperature: f64,
-    humidity: f64,
+struct WeatherSample {
+    temperature_c: f64,
+    humidity_ratio: f64,
 }
 
-impl Sensor {
-    fn new() -> Self {
-        let mut rng = rand::thread_rng();
-        Self {
-            temperature: rng.gen_range(18.0..26.0),
-            humidity: rng.gen_range(0.40..0.80),
-        }
+impl WeatherSample {
+    fn temp(&self) -> f64 {
+        (self.temperature_c * 100.0).round() / 100.0
     }
 
-    fn tick(&mut self) {
-        let mut rng = rand::thread_rng();
-        self.temperature = (self.temperature + rng.gen_range(-0.5_f64..0.5)).clamp(0.0, 50.0);
-        self.humidity = (self.humidity + rng.gen_range(-0.02_f64..0.02)).clamp(0.0, 1.0);
+    fn hum(&self) -> f64 {
+        (self.humidity_ratio * 1000.0).round() / 1000.0
     }
+}
 
-    fn temp(&self) -> f64 { (self.temperature * 100.0).round() / 100.0 }
-    fn hum(&self)  -> f64 { (self.humidity  * 1000.0).round() / 1000.0 }
+async fn fetch_current_weather(client: &reqwest::Client) -> Result<WeatherSample> {
+    let url = format!(
+        "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat={}&lon={}",
+        BRAUNSCHWEIG_LAT, BRAUNSCHWEIG_LON
+    );
+
+    let response = client
+        .get(url)
+        .header(USER_AGENT, MET_USER_AGENT)
+        .send()
+        .await
+        .context("request to api.met.no failed")?
+        .error_for_status()
+        .context("api.met.no returned non-success status")?;
+
+    let body: Value = response
+        .json()
+        .await
+        .context("failed to parse api.met.no response JSON")?;
+
+    let details = body
+        .get("properties")
+        .and_then(|p| p.get("timeseries"))
+        .and_then(Value::as_array)
+        .and_then(|series| series.first())
+        .and_then(|item| item.get("data"))
+        .and_then(|data| data.get("instant"))
+        .and_then(|instant| instant.get("details"))
+        .ok_or_else(|| anyhow!("api.met.no response missing properties.timeseries[0].data.instant.details"))?;
+
+    let temperature_c = details
+        .get("air_temperature")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| anyhow!("api.met.no response missing air_temperature"))?;
+
+    let humidity_percent = details
+        .get("relative_humidity")
+        .and_then(Value::as_f64)
+        .ok_or_else(|| anyhow!("api.met.no response missing relative_humidity"))?;
+
+    Ok(WeatherSample {
+        temperature_c,
+        humidity_ratio: (humidity_percent / 100.0).clamp(0.0, 1.0),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +242,12 @@ async fn main() {
 // ---------------------------------------------------------------------------
 
 async fn run_session(plugin_id: &str, ws_url: &str) -> Result<()> {
+    let http_client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(20))
+        .build()
+        .context("failed to build HTTP client")?;
+
     let (ws, _resp) = connect_async(ws_url)
         .await
         .context("WebSocket connect failed")?;
@@ -232,7 +280,7 @@ async fn run_session(plugin_id: &str, ws_url: &str) -> Result<()> {
     info!(plugin_id, "Registered as WeatherObserved");
 
     // -- Create initial entity -------------------------------------------
-    let mut sensor = Sensor::new();
+    let first_sample = fetch_current_weather(&http_client).await?;
     let eid = entity_id(plugin_id);
     let cr_ref = next_ref();
     sink.send(phx_msg(
@@ -242,7 +290,7 @@ async fn run_session(plugin_id: &str, ws_url: &str) -> Result<()> {
         "entity_create",
         json!({
             "request_id": cr_ref,
-            "entity": build_entity(plugin_id, sensor.temp(), sensor.hum())
+            "entity": build_entity(plugin_id, first_sample.temp(), first_sample.hum())
         }),
     ))
     .await
@@ -250,13 +298,13 @@ async fn run_session(plugin_id: &str, ws_url: &str) -> Result<()> {
     info!(
         plugin_id,
         entity_id = eid,
-        temp = sensor.temp(),
-        humidity = sensor.hum(),
+        temp = first_sample.temp(),
+        humidity = first_sample.hum(),
         "Initial entity created"
     );
 
     // -- Event loop -------------------------------------------------------
-    let mut update_tick = interval(Duration::from_secs(10));
+    let mut update_tick = interval(Duration::from_secs(600));
     let mut hb_tick     = interval(Duration::from_secs(30));
     update_tick.tick().await; // skip the immediate first fire
 
@@ -275,22 +323,28 @@ async fn run_session(plugin_id: &str, ws_url: &str) -> Result<()> {
             }
 
             _ = update_tick.tick() => {
-                sensor.tick();
-                let upd_ref = next_ref();
-                sink.send(phx_msg(
-                    None,
-                    &upd_ref,
-                    &topic,
-                    "entity_update",
-                    json!({
-                        "request_id": upd_ref,
-                        "entity_id":  eid,
-                        "attrs":      build_update_attrs(sensor.temp(), sensor.hum())
-                    }),
-                ))
-                .await
-                .context("send entity_update")?;
-                info!(plugin_id, temp = sensor.temp(), humidity = sensor.hum(), "Published update");
+                match fetch_current_weather(&http_client).await {
+                    Ok(sample) => {
+                        let upd_ref = next_ref();
+                        sink.send(phx_msg(
+                            None,
+                            &upd_ref,
+                            &topic,
+                            "entity_update",
+                            json!({
+                                "request_id": upd_ref,
+                                "entity_id":  eid,
+                                "attrs":      build_update_attrs(sample.temp(), sample.hum())
+                            }),
+                        ))
+                        .await
+                        .context("send entity_update")?;
+                        info!(plugin_id, temp = sample.temp(), humidity = sample.hum(), "Published update from api.met.no");
+                    }
+                    Err(e) => {
+                        warn!(plugin_id, error = %e, "Skipping update because weather fetch failed");
+                    }
+                }
             }
 
             _ = hb_tick.tick() => {
