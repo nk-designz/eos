@@ -1,8 +1,8 @@
-# Example Plugin CR — deploy the temp-humidity sensor via the EOS operator
+# Example Plugin CR — deploy the weather plugin via the EOS operator
 #
 # Prerequisites:
 #   1. A Broker CR named "default-broker" already exists in the same namespace
-#   2. The plugin image is available (build with: docker build -t temp-humidity-plugin:latest .)
+#   2. The plugin image is available (build with: docker build -t weather-plugin:latest .)
 #
 # Apply with:
 #   kubectl apply -f plugin.yaml -n fiware
@@ -10,9 +10,9 @@
 apiVersion: eos.io/v1alpha1
 kind: Plugin
 metadata:
-  name: temp-sensor-1
+  name: weather-plugin
   namespace: fiware
 spec:
-  image: temp-humidity-plugin:latest
+  image: weather-plugin:latest
   brokerRef:
     name: default-broker

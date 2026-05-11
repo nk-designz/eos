@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: nk-designz/temp-humidity-plugin
+  IMAGE_NAME: nk-designz/weather-plugin
 
 jobs:
   build-and-push:
