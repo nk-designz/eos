@@ -151,14 +151,27 @@ defmodule Eos.Broker.Client do
 
         {:ok, sub_id}
 
-      {:ok, %{status: 409}} ->
-        # Subscription already exists (idempotent) — use the ID from the payload
-        sub_id = subscription_body["id"]
-        Logger.info("[Broker] Subscription #{sub_id} already exists, treating as success")
-        {:ok, sub_id}
-
       {:ok, %{status: status, body: body}} ->
         Logger.warning("[Broker] create_subscription failed #{status}: #{inspect(body)}")
+        {:error, {status, body}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  def get_subscription(sub_id), do: get_subscription(sub_id, nil)
+
+  def get_subscription(sub_id, tenant) do
+    case Req.get(base_req(tenant), url: "/subscriptions/#{URI.encode(sub_id)}") do
+      {:ok, %{status: 200, body: body}} ->
+        {:ok, body}
+
+      {:ok, %{status: 404}} ->
+        :not_found
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.warning("[Broker] get_subscription failed #{status}: #{inspect(body)}")
         {:error, {status, body}}
 
       {:error, reason} ->
