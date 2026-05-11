@@ -96,7 +96,11 @@ defmodule EosWeb.PluginLive.Show do
             <h2 class="font-semibold">Registration</h2>
             <%= if @registered do %>
               <.info_row label="Entity Type URI" value={@registered.entity_type_uri} mono />
-              <.info_row label="Subscription ID" value={@registered.subscription_id || "Pending…"} mono />
+              <.info_row
+                label="Subscription ID"
+                value={@registered.subscription_id || "Pending…"}
+                mono
+              />
               <.info_row label="Connected At" value={format_datetime(@registered.connected_at)} />
             <% else %>
               <p class="text-xs text-base-content/40">Not registered yet</p>
@@ -108,7 +112,10 @@ defmodule EosWeb.PluginLive.Show do
             <%= if @registered do %>
               <.info_row label="Broker URL" value={@registered.broker_config.url} mono />
               <.info_row label="Tenant" value={@registered.broker_config.tenant || "default"} />
-              <.info_row label="Auth" value={if(@registered.broker_config.token, do: "Bearer token set", else: "None")} />
+              <.info_row
+                label="Auth"
+                value={if(@registered.broker_config.token, do: "Bearer token set", else: "None")}
+              />
             <% else %>
               <p class="text-xs text-base-content/40">Not registered yet</p>
             <% end %>
@@ -188,8 +195,7 @@ defmodule EosWeb.PluginLive.Show do
                     {get_in(@plugin, ["status", "podName"]) || "eos-plugin-#{@plugin_name}"}
                   </span>
                   <span class="flex items-center gap-1.5 text-xs text-success">
-                    <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span>
-                    live
+                    <span class="w-1.5 h-1.5 rounded-full bg-success animate-pulse"></span> live
                   </span>
                 </div>
                 <pre
@@ -259,7 +265,9 @@ defmodule EosWeb.PluginLive.Show do
         {:ok, text} when is_binary(text) and text != "" ->
           # Strip ANSI escape sequences (colors, bold, dim, etc.)
           String.replace(text, ~r/\x1b\[[0-9;]*[A-Za-z]/, "")
-        _ -> nil
+
+        _ ->
+          nil
       end
 
     assign(socket, :logs, logs)
@@ -267,8 +275,9 @@ defmodule EosWeb.PluginLive.Show do
 
   defp load_entities(socket, plugin_name) do
     entities =
-      with {:ok, %{entity_type_uri: type_uri, tenant: tenant}} <- Registry.lookup(plugin_name),
-           {:ok, list} <- Client.list_entities(type_uri, tenant) do
+      with {:ok, %{entity_type_uri: type_uri, broker_config: broker_config}} <-
+             Registry.lookup(plugin_name),
+           {:ok, list} <- Client.list_entities(type_uri, broker_config) do
         list
       else
         _ -> []

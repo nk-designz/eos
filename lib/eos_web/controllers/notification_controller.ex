@@ -23,8 +23,14 @@ defmodule EosWeb.NotificationController do
       entity_type = entity["type"]
 
       Registry.find_by_entity_type(entity_type)
-      |> Enum.each(fn %{channel_pid: pid} ->
+      |> Enum.each(fn %{plugin_id: plugin_id, channel_pid: pid} ->
         PluginChannel.push_entity_changed(pid, entity_id, entity)
+
+        Phoenix.PubSub.broadcast(
+          Eos.PubSub,
+          "plugin_events:#{plugin_id}",
+          {:entity_event, "#{entity_type} changed: #{entity_id}"}
+        )
       end)
     end)
 
