@@ -68,27 +68,49 @@ defmodule EosWeb.PluginLive.Show do
 
         <div class="grid grid-cols-2 gap-4">
           <div class="card bg-base-200 shadow p-4 space-y-2">
-            <h2 class="font-semibold">Spec</h2>
+            <h2 class="font-semibold">Configuration</h2>
             <%= if @plugin do %>
               <% spec = @plugin["spec"] || %{} %>
               <.info_row label="Image" value={spec["image"]} mono />
-              <.info_row label="Entity Type" value={spec["entityTypeUri"]} mono />
+              <.info_row label="Broker Ref" value={spec["brokerRef"]} />
               <.info_row label="Tenant" value={spec["tenant"] || "default"} />
               <.info_row label="Replicas" value={spec["replicas"] || 1} />
             <% end %>
           </div>
 
           <div class="card bg-base-200 shadow p-4 space-y-2">
-            <h2 class="font-semibold">Status</h2>
+            <h2 class="font-semibold">Runtime Status</h2>
             <%= if @plugin do %>
               <% status = @plugin["status"] || %{} %>
               <.info_row label="Phase" value={status["phase"] || "Unknown"} />
               <.info_row label="Pod" value={status["podName"] || "—"} mono />
-              <.info_row label="Subscription ID" value={status["subscriptionId"] || "—"} mono />
-              <.info_row label="Registered At" value={status["registeredAt"] || "—"} />
               <%= if status["errorMessage"] do %>
                 <.info_row label="Error" value={status["errorMessage"]} />
               <% end %>
+            <% end %>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="card bg-base-200 shadow p-4 space-y-2">
+            <h2 class="font-semibold">Registration</h2>
+            <%= if @registered do %>
+              <.info_row label="Entity Type URI" value={@registered.entity_type_uri} mono />
+              <.info_row label="Subscription ID" value={@registered.subscription_id || "Pending…"} mono />
+              <.info_row label="Connected At" value={format_datetime(@registered.connected_at)} />
+            <% else %>
+              <p class="text-xs text-base-content/40">Not registered yet</p>
+            <% end %>
+          </div>
+
+          <div class="card bg-base-200 shadow p-4 space-y-2">
+            <h2 class="font-semibold">Broker Config</h2>
+            <%= if @registered do %>
+              <.info_row label="Broker URL" value={@registered.broker_config.url} mono />
+              <.info_row label="Tenant" value={@registered.broker_config.tenant || "default"} />
+              <.info_row label="Auth" value={if(@registered.broker_config.token, do: "Bearer token set", else: "None")} />
+            <% else %>
+              <p class="text-xs text-base-content/40">Not registered yet</p>
             <% end %>
           </div>
         </div>
@@ -212,9 +234,16 @@ defmodule EosWeb.PluginLive.Show do
 
     connected = Registry.connected?(plugin_name)
 
+    registered =
+      case Registry.lookup(plugin_name) do
+        {:ok, entry} -> entry
+        :error -> nil
+      end
+
     socket
     |> assign(:plugin, plugin)
     |> assign(:connected, connected)
+    |> assign(:registered, registered)
   end
 
   defp fetch_logs(socket) do
@@ -247,4 +276,13 @@ defmodule EosWeb.PluginLive.Show do
 
     assign(socket, :entities, entities)
   end
+
+  defp format_datetime(datetime) when is_struct(datetime, DateTime) do
+    datetime
+    |> DateTime.truncate(:second)
+    |> to_string()
+  end
+
+  defp format_datetime(nil), do: "—"
+  defp format_datetime(value), do: to_string(value)
 end
