@@ -151,6 +151,12 @@ defmodule Eos.Broker.Client do
 
         {:ok, sub_id}
 
+      {:ok, %{status: 409}} ->
+        # Subscription already exists (idempotent) — use the ID from the payload
+        sub_id = subscription_body["id"]
+        Logger.info("[Broker] Subscription #{sub_id} already exists, treating as success")
+        {:ok, sub_id}
+
       {:ok, %{status: status, body: body}} ->
         Logger.warning("[Broker] create_subscription failed #{status}: #{inspect(body)}")
         {:error, {status, body}}
