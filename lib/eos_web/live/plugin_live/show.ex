@@ -141,7 +141,7 @@ defmodule EosWeb.PluginLive.Show do
                   <tr>
                     <td class="font-mono text-xs">{entity["id"]}</td>
                     <td class="font-mono text-xs">{entity["type"]}</td>
-                    <td>{get_in(entity, ["modifiedAt", "value"]) || "—"}</td>
+                    <td>{entity_modified_at(entity)}</td>
                   </tr>
                 <% end %>
                 <%= if @entities == [] do %>
@@ -294,4 +294,14 @@ defmodule EosWeb.PluginLive.Show do
 
   defp format_datetime(nil), do: "—"
   defp format_datetime(value), do: to_string(value)
+
+  defp entity_modified_at(entity) when is_map(entity) do
+    case entity["modifiedAt"] do
+      %{"value" => value} when is_binary(value) -> value
+      value when is_binary(value) -> value
+      _ -> "—"
+    end
+  end
+
+  defp entity_modified_at(_), do: "—"
 end
